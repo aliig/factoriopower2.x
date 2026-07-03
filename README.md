@@ -1,10 +1,20 @@
 # factorionuclear2.x
 
-Factorio nuclear power calculator for 2.0 / Space Age, with quality support.
+Nuclear power calculator for **Factorio 2.0.7 and later**, with quality
+support from the **Space Age** expansion.
 
 Given an `x` by `y` grid of nuclear reactors, computes how many heat
 exchangers, steam turbines, and offshore pumps are needed to convert all of
 the heat into electricity, plus fuel cell consumption.
+
+## Compatibility
+
+- **Factorio 2.0.7+ required.** Version 2.0.7 changed the water:steam ratio
+  from 1:1 to 1:10, which this calculator's offshore pump math depends on.
+  For 1.1 (or 2.0.0–2.0.6) multiply the pump count by 10.
+- **Quality tiers require Space Age** (specifically its Quality mod). Without
+  it, everything is normal quality — the default — and the calculator matches
+  the base game.
 
 ## Usage
 
