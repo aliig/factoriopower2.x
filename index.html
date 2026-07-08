@@ -127,7 +127,28 @@
     color: #b6e3b6;
   }
   .cell:hover { border-color: var(--orange); }
+  .cell.blocked {
+    position: relative;
+    border-color: #c9302c;
+    background: linear-gradient(#5a3d3d, #452d2d);
+    color: #e3b6b6;
+  }
+  .cell.blocked::after {
+    content: "⚠";
+    position: absolute;
+    top: -1px;
+    right: 2px;
+    font-size: 0.7rem;
+    color: #ffcc00;
+  }
   .grid-hint { color: var(--text-dim); font-size: 0.8rem; margin: 8px 0 0; }
+  .grid-warning {
+    display: none;
+    color: #ffcc00;
+    font-size: 0.85rem;
+    margin: 8px 0 0;
+  }
+  .grid-warning.active { display: block; }
 
   .quality-grid {
     display: grid;
@@ -197,6 +218,7 @@
         <button id="clear" type="button">Clear</button>
       </div>
       <div id="grid" role="grid" aria-label="Reactor layout grid"></div>
+      <p class="grid-warning" id="grid-warning"></p>
       <p class="grid-hint">Click cells to toggle reactors. Each cell shows its heat multiplier
         (1 + adjacent reactors from the +100% neighbour bonus).</p>
     </section>
@@ -281,15 +303,22 @@
     const { w, h } = dims();
     gridEl.style.gridTemplateColumns = `repeat(${w}, 42px)`;
     gridEl.replaceChildren();
+    let blockedCount = 0;
     for (let i = 0; i < h; i++) {
       for (let j = 0; j < w; j++) {
         const cell = document.createElement("button");
         cell.type = "button";
-        cell.className = "cell" + (layout[i][j] ? " on" : "");
-        const mult = layout[i][j] ? 1 + getNeighbourCount(layout, i, j) : 0;
-        cell.textContent = layout[i][j] ? "×" + mult : "";
+        const neighbours = layout[i][j] ? getNeighbourCount(layout, i, j) : 0;
+        // Reactors are 5x5, so a reactor with all four sides covered by other
+        // reactors has no tile an inserter could feed fuel from.
+        const blocked = layout[i][j] && neighbours === 4;
+        if (blocked) blockedCount += 1;
+        cell.className = "cell" + (layout[i][j] ? " on" : "") + (blocked ? " blocked" : "");
+        cell.textContent = layout[i][j] ? "×" + (1 + neighbours) : "";
         cell.setAttribute("aria-label",
-          `Row ${i + 1}, column ${j + 1}: ` + (layout[i][j] ? `reactor, x${mult} heat` : "empty"));
+          `Row ${i + 1}, column ${j + 1}: ` + (layout[i][j]
+            ? `reactor, x${1 + neighbours} heat` + (blocked ? ", unreachable by inserters" : "")
+            : "empty"));
         cell.addEventListener("click", () => {
           backing[i][j] = !backing[i][j];
           update();
@@ -297,6 +326,12 @@
         gridEl.appendChild(cell);
       }
     }
+    const warning = document.getElementById("grid-warning");
+    warning.classList.toggle("active", blockedCount > 0);
+    warning.textContent = blockedCount > 0
+      ? `⚠ ${blockedCount} reactor${blockedCount > 1 ? "s are" : " is"} enclosed on all four sides — `
+        + "inserters can't reach them to insert fuel cells."
+      : "";
   }
 
   function formatPower(mw) {
