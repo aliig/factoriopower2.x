@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Factorio Nuclear Power Calculator</title>
-<meta name="description" content="Interactive nuclear power calculator for Factorio 2.0.7+ with Space Age quality support. Plan reactor layouts and get exact heat exchanger, turbine, and pump counts.">
+<title>Factorio Nuclear &amp; Fusion Power Calculator</title>
+<meta name="description" content="Interactive nuclear and fusion power calculator for Factorio 2.x with Space Age quality support. Plan reactor layouts and get exact heat exchanger, turbine, generator, and cryogenic plant counts.">
 <style>
   :root {
     --bg: #1b1a1b;
@@ -44,6 +44,25 @@
     margin: 0 0 20px;
     font-size: 0.9rem;
   }
+  .tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 16px;
+  }
+  .tab {
+    padding: 8px 20px;
+    font-size: 0.95rem;
+    border-radius: 4px 4px 0 0;
+    border-bottom: 2px solid transparent;
+  }
+  .tab[aria-selected="true"] {
+    color: var(--orange);
+    border-color: var(--orange);
+    background: var(--panel);
+  }
+  body[data-mode="nuclear"] .fusion-only { display: none; }
+  body[data-mode="fusion"] .nuclear-only { display: none; }
+
   .panels {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -156,6 +175,7 @@
     gap: 8px 12px;
     align-items: center;
   }
+  .quality-grid + .quality-grid { margin-top: 8px; }
   .quality-grid label { margin: 0; font-size: 0.9rem; color: var(--text); }
   .quality-grid .master-label { color: var(--orange); }
   select.q-normal { color: var(--q-normal); }
@@ -199,8 +219,13 @@
 </head>
 <body>
 <main>
-  <h1>Factorio Nuclear Power Calculator</h1>
-  <p class="subtitle">For Factorio 2.0.7+ · quality tiers from Space Age · exact ratios, no over-provisioning</p>
+  <h1>Factorio Nuclear &amp; Fusion Power Calculator</h1>
+  <p class="subtitle">For Factorio 2.x · quality tiers from Space Age · exact ratios, no over-provisioning</p>
+
+  <div class="tabs" role="tablist" aria-label="Power technology">
+    <button class="tab" id="tab-nuclear" role="tab" aria-selected="true" type="button">Nuclear</button>
+    <button class="tab" id="tab-fusion" role="tab" aria-selected="false" type="button">Fusion</button>
+  </div>
 
   <div class="panels">
     <section class="panel">
@@ -219,8 +244,12 @@
       </div>
       <div id="grid" role="grid" aria-label="Reactor layout grid"></div>
       <p class="grid-warning" id="grid-warning"></p>
-      <p class="grid-hint">Click cells to toggle reactors. Each cell shows its heat multiplier
+      <p class="grid-hint">Click cells to toggle reactors. Each cell shows its
+        <span class="nuclear-only">heat</span><span class="fusion-only">plasma</span> multiplier
         (1 + adjacent reactors from the +100% neighbour bonus).</p>
+      <p class="grid-hint fusion-only">Fusion reactors link through shared fluid connections
+        (two per side), so staggered layouts can reach up to +500% in-game; this grid only
+        models directly adjacent reactors.</p>
     </section>
 
     <section class="panel">
@@ -228,6 +257,8 @@
       <div class="quality-grid">
         <label class="master-label" for="q-all">All components</label>
         <select id="q-all"></select>
+      </div>
+      <div class="quality-grid nuclear-only">
         <label for="q-reactor">Reactors</label>
         <select id="q-reactor" data-component></select>
         <label for="q-heatExchanger">Heat exchangers</label>
@@ -236,6 +267,14 @@
         <select id="q-turbine" data-component></select>
         <label for="q-pump">Offshore pumps</label>
         <select id="q-pump" data-component></select>
+      </div>
+      <div class="quality-grid fusion-only">
+        <label for="q-fusionReactor">Fusion reactors</label>
+        <select id="q-fusionReactor" data-component></select>
+        <label for="q-fusionGenerator">Fusion generators</label>
+        <select id="q-fusionGenerator" data-component></select>
+        <label for="q-cryoPlant">Cryogenic plants</label>
+        <select id="q-cryoPlant" data-component></select>
       </div>
     </section>
 
@@ -248,7 +287,7 @@
   <footer>
     Base stats from the game's prototype definitions
     (<a href="https://wiki.factorio.com/Data.raw">data.raw</a>).
-    Fuel burns at the base rate — the neighbour bonus is free heat.
+    Fuel burns at the base rate — the neighbour bonus is free energy.
     Source &amp; math notes: <a href="https://github.com/aliig/factorionuclear2.x">github.com/aliig/factorionuclear2.x</a>
   </footer>
 </main>
@@ -256,9 +295,11 @@
 <script src="calc.js"></script>
 <script>
 (function () {
-  const { QUALITY_TIERS, REACTOR_HEAT_OUTPUT, getNeighbourCount, calculateRequirements } = NuclearCalc;
+  const { QUALITY_TIERS, REACTOR_HEAT_OUTPUT, FUSION_REACTOR_PLASMA_OUTPUT,
+          getNeighbourCount, calculateRequirements, calculateFusionRequirements } = NuclearCalc;
 
   const MAX_DIM = 20;
+  let mode = location.hash === "#fusion" ? "fusion" : "nuclear";
   const widthInput = document.getElementById("width");
   const heightInput = document.getElementById("height");
   const gridEl = document.getElementById("grid");
@@ -309,8 +350,8 @@
         const cell = document.createElement("button");
         cell.type = "button";
         const neighbours = layout[i][j] ? getNeighbourCount(layout, i, j) : 0;
-        // Reactors are 5x5, so a reactor with all four sides covered by other
-        // reactors has no tile an inserter could feed fuel from.
+        // Reactors (5x5 fission, 6x6 fusion) with all four sides covered by
+        // other reactors have no tile an inserter could feed fuel from.
         const blocked = layout[i][j] && neighbours === 4;
         if (blocked) blockedCount += 1;
         cell.className = "cell" + (layout[i][j] ? " on" : "") + (blocked ? " blocked" : "");
@@ -338,19 +379,13 @@
     return mw >= 1000 ? (mw / 1000).toLocaleString() + " GW" : mw.toLocaleString() + " MW";
   }
 
-  function renderResults() {
-    const layout = currentLayout();
+  function renderNuclearResults(layout) {
     const req = calculateRequirements(layout, {
       reactorQuality: qualityFor("reactor"),
       heatExchangerQuality: qualityFor("heatExchanger"),
       turbineQuality: qualityFor("turbine"),
       pumpQuality: qualityFor("pump"),
     });
-
-    if (req.reactors === 0) {
-      resultsEl.innerHTML = '<p class="empty-hint">No reactors placed — click cells in the layout grid to add some.</p>';
-      return;
-    }
 
     const perReactor = REACTOR_HEAT_OUTPUT[qualityFor("reactor")];
     resultsEl.innerHTML = `
@@ -369,6 +404,44 @@
       </table>`;
   }
 
+  function renderFusionResults(layout) {
+    const req = calculateFusionRequirements(layout, {
+      reactorQuality: qualityFor("fusionReactor"),
+      generatorQuality: qualityFor("fusionGenerator"),
+      cryoPlantQuality: qualityFor("cryoPlant"),
+    });
+
+    const perReactor = FUSION_REACTOR_PLASMA_OUTPUT[qualityFor("fusionReactor")];
+    resultsEl.innerHTML = `
+      <p class="power-line">${formatPower(req.netPower)}
+        <small>net output (${formatPower(req.power)} plasma − ${req.reactorDrain} MW reactor drain)</small></p>
+      <table>
+        <tr><td>Fusion reactors</td><td class="num">${req.reactors}</td>
+            <td class="note">${perReactor} MW plasma each before neighbour bonus</td></tr>
+        <tr><td>Fusion generators</td><td class="num">${req.generators}</td><td class="note"></td></tr>
+        <tr><td>Cryogenic plants</td><td class="num">${req.cryoPlants}</td>
+            <td class="note">cooling the fluoroketone loop</td></tr>
+        <tr><td>Fluoroketone loop</td><td class="num">${req.fluoroketonePerSecond.toFixed(1)}</td>
+            <td class="note">per second — cold in = hot out, unaffected by neighbour bonus</td></tr>
+        <tr><td>Reactor grid drain</td><td class="num">${req.reactorDrain}</td>
+            <td class="note">MW drawn by the reactors while running</td></tr>
+        <tr><td>Fusion power cells</td><td class="num">${req.fuelCellsPerMinute.toFixed(2)}</td>
+            <td class="note">per minute — one 40 GJ cell per reactor every
+              ${req.fuelCellBurnTime.toFixed(0)} s, burned only on demand</td></tr>
+      </table>`;
+  }
+
+  function renderResults() {
+    const layout = currentLayout();
+    const reactorCount = layout.flat().filter(Boolean).length;
+    if (reactorCount === 0) {
+      resultsEl.innerHTML = '<p class="empty-hint">No reactors placed — click cells in the layout grid to add some.</p>';
+      return;
+    }
+    if (mode === "fusion") renderFusionResults(layout);
+    else renderNuclearResults(layout);
+  }
+
   function update() {
     renderGrid();
     renderResults();
@@ -381,6 +454,21 @@
     }
     update();
   }
+
+  function setMode(next) {
+    mode = next;
+    document.body.dataset.mode = mode;
+    for (const tab of document.querySelectorAll(".tab")) {
+      tab.setAttribute("aria-selected", String(tab.id === "tab-" + mode));
+    }
+    if (location.hash !== (mode === "fusion" ? "#fusion" : "")) {
+      history.replaceState(null, "", mode === "fusion" ? "#fusion" : location.pathname);
+    }
+    update();
+  }
+
+  document.getElementById("tab-nuclear").addEventListener("click", () => setMode("nuclear"));
+  document.getElementById("tab-fusion").addEventListener("click", () => setMode("fusion"));
 
   populateSelect(document.getElementById("q-all"));
   for (const select of document.querySelectorAll("select[data-component]")) {
@@ -402,7 +490,7 @@
   document.getElementById("fill").addEventListener("click", () => setAllInRange(true));
   document.getElementById("clear").addEventListener("click", () => setAllInRange(false));
 
-  update();
+  setMode(mode);
 })();
 </script>
 </body>

@@ -16,6 +16,17 @@ function scaleByQuality(baseStat) {
   return scaled;
 }
 
+function scaleByQualityTenths(baseStat) {
+  // For base stats that are not multiples of 10 (e.g. 4/s coolant becomes
+  // 5.2/s at uncommon): values are kept in *tenths* of a unit so all the
+  // arithmetic below stays on exact integers.
+  const scaled = {};
+  for (const [q, tenths] of Object.entries(QUALITY_MULTIPLIER_TENTHS)) {
+    scaled[q] = baseStat * tenths;
+  }
+  return scaled;
+}
+
 // Heat output in MW, before neighbour bonus. https://wiki.factorio.com/Nuclear_reactor
 const REACTOR_HEAT_OUTPUT = scaleByQuality(40);
 
@@ -39,6 +50,36 @@ const STEAM_ENERGY_KJ = 97;
 const WATER_TO_STEAM_RATIO = 10;
 
 const FUEL_CELL_ENERGY_MJ = 8000; // fuel_value = "8GJ" per uranium fuel cell
+
+// --- Fusion (Space Age) ----------------------------------------------------
+// All base stats from data.raw (space-age/prototypes/, wube/factorio-data).
+
+// Plasma output in MW, before neighbour bonus: the reactor turns coolant into
+// plasma 1:1 at max_fluid_usage = 4/s, and one plasma unit at the default
+// 1,000,000 degC carries 25 MJ (heat_capacity = "25J"), so 4 x 25 = 100 MW.
+// The neighbour bonus (+100% per linked reactor) raises plasma *temperature*,
+// not fluid volume, so output energy scales while the fluid loop rate doesn't.
+const FUSION_REACTOR_PLASMA_OUTPUT = scaleByQuality(100);
+
+// Cold fluoroketone intake in tenths per second (max_fluid_usage = 4/s).
+// Independent of the neighbour bonus; the closed loop returns the same flow
+// as hot fluoroketone from the generators (plasma in = hot fluoroketone out).
+const FUSION_REACTOR_COOLANT_TENTHS = scaleByQualityTenths(4);
+
+// Electric drain in MW while operating (fusion-reactor power_input = "10MW").
+const FUSION_REACTOR_POWER_INPUT = scaleByQuality(10);
+
+// Max electric output in MW (fusion-generator output_flow_limit = "50MW").
+// Energy-limited: consumption and output scale together, so plasma MW
+// converts losslessly to electric MW at any quality.
+const FUSION_GENERATOR_OUTPUT = scaleByQuality(50);
+
+// Fluoroketone cooled in tenths per second: the fluoroketone-cooling recipe
+// converts 10 hot -> 10 cold in 5 s (2/s at speed 1) and the cryogenic
+// plant's crafting_speed is 2, giving 4/s at normal quality.
+const CRYO_PLANT_COOLING_TENTHS = scaleByQualityTenths(4);
+
+const FUSION_CELL_ENERGY_MJ = 40000; // fuel_value = "40GJ" per fusion power cell
 
 function ceilDiv(a, b) {
   return Math.floor((a + b - 1) / b);
@@ -114,15 +155,62 @@ function calculateRequirements(layout, {
   };
 }
 
+function calculateFusionRequirements(layout, {
+  reactorQuality = "normal",
+  generatorQuality = "normal",
+  cryoPlantQuality = "normal",
+  neighbouringBonus = 1,
+} = {}) {
+  const reactorCount = layout.flat().filter(Boolean).length;
+  const sre = calculateSRE(layout, neighbouringBonus);
+
+  const reactorOutput = FUSION_REACTOR_PLASMA_OUTPUT[reactorQuality];
+  const power = sre * reactorOutput; // MW of plasma, == MW of electricity once converted
+  const reactorDrain = reactorCount * FUSION_REACTOR_POWER_INPUT[reactorQuality];
+  const netPower = power - reactorDrain;
+
+  // As with nuclear, flows stay exact and the only rounding is the final
+  // ceilDiv per machine type. Generators are sized off total plasma energy
+  // (one shared network); the last one just runs at partial load.
+  const generators = ceilDiv(power, FUSION_GENERATOR_OUTPUT[generatorQuality]);
+
+  // The coolant loop is closed 1:1:1 (cold -> plasma -> hot), so the flow
+  // the cryo plants must cool equals the reactors' cold intake.
+  const fluoroketoneTenths = reactorCount * FUSION_REACTOR_COOLANT_TENTHS[reactorQuality];
+  const cryoPlants = ceilDiv(fluoroketoneTenths, CRYO_PLANT_COOLING_TENTHS[cryoPlantQuality]);
+
+  // Fuel burns at the reactor's base output rate (the neighbour bonus is
+  // free energy), and only on demand — fusion has no idle burn, so this is
+  // the consumption at full load.
+  const fuelCellBurnTime = FUSION_CELL_ENERGY_MJ / reactorOutput;
+  const fuelCellsPerMinute = (reactorCount * 60) / fuelCellBurnTime;
+
+  return {
+    reactors: reactorCount,
+    generators,
+    cryoPlants,
+    power,
+    reactorDrain,
+    netPower,
+    fluoroketonePerSecond: fluoroketoneTenths / 10,
+    fuelCellsPerMinute,
+    fuelCellBurnTime,
+  };
+}
+
+// Global name kept from the nuclear-only days; it now covers fusion too.
 const NuclearCalc = {
   QUALITY_TIERS,
   REACTOR_HEAT_OUTPUT,
   HEAT_EXCHANGER_CONSUMPTION,
   STEAM_TURBINE_CONSUMPTION,
   OFFSHORE_PUMP_OUTPUT,
+  FUSION_REACTOR_PLASMA_OUTPUT,
+  FUSION_GENERATOR_OUTPUT,
   getNeighbourCount,
   calculateSRE,
   calculateRequirements,
+  calculateFusionRequirements,
 };
 
 if (typeof module !== "undefined" && module.exports) {
