@@ -3,9 +3,19 @@
 Nuclear power calculator for **Factorio 2.0.7 and later**, with quality
 support from the **Space Age** expansion.
 
+**Try it in your browser: <https://aliig.github.io/factorionuclear2.x/>**
+
 Given an `x` by `y` grid of nuclear reactors, computes how many heat
 exchangers, steam turbines, and offshore pumps are needed to convert all of
 the heat into electricity, plus fuel cell consumption.
+
+## Web version
+
+The interactive version (`index.html` + `calc.js`, no build step) goes beyond
+the CLI: cells in the reactor grid are clickable, so irregular layouts
+(rings, checkerboards, L-shapes) are supported, with each reactor's neighbour
+bonus multiplier shown in place. `parity_check.py` verifies the JavaScript
+port produces identical results to the Python implementation.
 
 ## Compatibility
 
