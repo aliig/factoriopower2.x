@@ -1,9 +1,19 @@
 {
   "name": "factoriopower2.x",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Factorio Power Planner — nuclear, fusion, and solar power calculator for Factorio 2.x with Space Age quality support.",
+  "type": "module",
   "scripts": {
-    "test": "node test.js"
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.8.3",
+    "vite": "^7.1.5",
+    "vitest": "^3.2.4"
+  }
 }
