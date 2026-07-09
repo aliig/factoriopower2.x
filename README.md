@@ -1,24 +1,28 @@
 # factorionuclear2.x
 
-Nuclear **and fusion** power calculator for **Factorio 2.0.7 and later**,
-with quality support from the **Space Age** expansion.
+Nuclear, **fusion, and solar** power calculator for **Factorio 2.0.7 and
+later**, with quality support from the **Space Age** expansion.
 
 **Try it in your browser: <https://aliig.github.io/factorionuclear2.x/>**
 
 Given an `x` by `y` grid of reactors, computes everything needed to convert
 their output into electricity: for nuclear, heat exchangers, steam turbines,
 and offshore pumps; for fusion, fusion generators and cryogenic plants for
-the fluoroketone coolant loop — plus fuel cell consumption for both.
+the fluoroketone coolant loop — plus fuel cell consumption for both. The
+solar mode is a per-surface planner instead: exact solar panel :
+accumulator ratios for every planet (and space platform orbit), at any
+quality mix, with optional concrete counts for a target average power.
 
 ## Web version
 
 The interactive version (`index.html` + `calc.js`, no build step) goes beyond
 the CLI: cells in the reactor grid are clickable, so irregular layouts
 (rings, checkerboards, L-shapes) are supported, with each reactor's neighbour
-bonus multiplier shown in place. Nuclear and fusion live on separate tabs
-(link directly to fusion with `#fusion`) sharing the same layout grid.
-`parity_check.py` verifies the JavaScript port produces identical results to
-the Python implementation.
+bonus multiplier shown in place. Nuclear, fusion, and solar live on separate
+tabs (deep links: `#fusion`, `#solar`); nuclear and fusion share the layout
+grid, while solar shows the per-surface ratio table with an optional target
+power input. `parity_check.py` verifies the JavaScript port produces
+identical results to the Python implementation.
 
 ## Compatibility
 
@@ -40,14 +44,19 @@ python main.py -x 2 -y 2 -q legendary
 python main.py -x 2 -y 2 --reactor-quality legendary --turbine-quality rare
 python main.py --mode fusion -x 2 -y 2
 python main.py --mode fusion -x 2 -y 2 --reactor-quality legendary --cryo-plant-quality rare
+python main.py --mode solar
+python main.py --mode solar --panel-quality legendary --accumulator-quality normal --power 100
 ```
 
-`--mode` picks the technology (`nuclear`, the default, or `fusion`).
+`--mode` picks the technology (`nuclear`, the default, `fusion`, or `solar`).
 `-q/--quality` sets the quality tier for all components; the per-component
 flags (`--reactor-quality`, `--heat-exchanger-quality`, `--turbine-quality`,
 `--pump-quality` for nuclear; `--reactor-quality`, `--generator-quality`,
-`--cryo-plant-quality` for fusion) override it individually. Tiers: `normal`,
-`uncommon`, `rare`, `epic`, `legendary`.
+`--cryo-plant-quality` for fusion; `--panel-quality`,
+`--accumulator-quality` for solar) override it individually. Tiers: `normal`,
+`uncommon`, `rare`, `epic`, `legendary`. Solar ignores `-x/-y` (there is no
+layout) and accepts `--power MW` to turn the per-MW table into concrete
+panel and accumulator counts.
 
 ## The math
 
@@ -115,6 +124,60 @@ Unlike nuclear, fusion machine counts are **not** quality-invariant under
 mixed quality: reactor output and generator capacity are different stats, so
 e.g. legendary reactors with normal generators need 2.5× the generators.
 
+## The math (solar)
+
+Base stats from data.raw: solar panel `production = "60kW"`, accumulator
+`buffer_capacity = "5MJ"` and `input/output_flow_limit = "300kW"`. Each
+surface defines `solar-power` (%) and `day-night-cycle` via its
+surface properties: Nauvis 100% / 420 s, Vulcanus 400% / 90 s, Gleba
+50% / 600 s, Fulgora 20% / 180 s, Aquilo 1% / 1200 s. Space platforms use
+the planets' `solar_power_in_space` (300/600/200/120/60%) and have **no
+day/night cycle at all** — panels produce constant peak power and solar
+needs no accumulators there.
+
+The day/night shape is the same on every surface, only stretched: full
+daylight for 1/2 of the cycle, a linear dusk ramp for 1/5, night for 1/10,
+and a linear dawn ramp for 1/5. From that:
+
+- **Average output = 7/10 of peak** (day + half of each ramp). A normal
+  panel on Nauvis averages 42 kW.
+- Drawing that average around the clock, accumulators must cover the night
+  plus the below-average parts of both ramps:
+  7/10·1/10 + (7/10)²/2·(2/5) = **21/125 of peak × cycle length**. On
+  Nauvis that is 60 kW × 420 s × 21/125 = 4233.6 kJ per panel, i.e.
+  4233.6/5000 = **0.84672 accumulators per panel — exactly 2646:3125**.
+- Note this is *not* the folklore 0.84 (21:25): Factorio 2.0 changed the
+  day from 25,000 to 25,200 ticks (exactly 7 minutes), which is why most
+  older ratio tables are slightly off.
+- Accumulators are also limited by **discharge speed** (300 kW × the
+  standard quality multiplier). The count is therefore
+  max(energy-based, flow-based). At normal quality the energy term always
+  wins, but high-quality accumulators on short-night planets flip it:
+  legendary accumulators on Vulcanus need 0.224 per panel for flow even
+  though 0.121 would store enough energy — such rows are marked in the
+  table.
+- A handy invariant: the energy-based accumulator count per average MW is
+  `0.24 × cycle seconds / capacity MJ`, independent of panel quality and
+  solar strength (20.16/MW on Nauvis at normal quality).
+
+**Accumulator quality is special**: the engine gives accumulators **+100%
+capacity per quality level** (5/10/15/20/30 MJ), not the standard +30% —
+while the flow limit scales normally (300/390/480/570/750 kW). Panel output
+scales normally too, so mixed-quality ratios change shape: legendary panels
+with normal accumulators need 2.1168 accumulators per panel on Nauvis, and
+normal panels with legendary accumulators only 0.14112.
+
+The simple and precise ratio columns are the closest rational
+approximations of the exact ratio — simple keeps the smaller term ≤ 20,
+precise allows both up to 99 — found by exact integer search, with the
+signed error shown (e.g. Nauvis simple `13:11 (−0.07%)` runs the
+accumulators 0.07% short of perfect; sizing off the per-MW columns is
+always exact). The caps are a friendliness preference, not a hard limit:
+when no capped ratio lands within 1% of the truth (very lopsided ratios,
+like legendary accumulators on Aquilo), the larger term is allowed to grow
+so the shown ratio stays honest — `248:1 (+0.01%)` rather than a distorted
+`99:1 (+151%)`.
+
 ## Quality (Space Age)
 
 Quality scales machine stats by +30% per level, +150% at legendary
@@ -131,6 +194,9 @@ Quality scales machine stats by +30% per level, +150% at legendary
 | Fusion reactor grid drain (MW) | 10 | 13 | 16 | 19 | 25 |
 | Fusion generator output (MW) | 50 | 65 | 80 | 95 | 125 |
 | Cryogenic plant cooling (/s) | 4 | 5.2 | 6.4 | 7.6 | 10 |
+| Solar panel peak output (kW) | 60 | 78 | 96 | 114 | 150 |
+| Accumulator capacity (MJ) — special +100%/level | 5 | 10 | 15 | 20 | 30 |
+| Accumulator charge/discharge (kW) | 300 | 390 | 480 | 570 | 750 |
 
 For nuclear, everything scales by the same multiplier, so an all-legendary
 build uses the same machine *counts* as an all-normal one but produces 2.5x

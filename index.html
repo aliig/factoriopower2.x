@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Factorio Nuclear &amp; Fusion Power Calculator</title>
-<meta name="description" content="Interactive nuclear and fusion power calculator for Factorio 2.x with Space Age quality support. Plan reactor layouts and get exact heat exchanger, turbine, generator, and cryogenic plant counts.">
+<title>Factorio Nuclear, Fusion &amp; Solar Power Calculator</title>
+<meta name="description" content="Interactive nuclear, fusion, and solar power calculator for Factorio 2.x with Space Age quality support. Plan reactor layouts, get exact machine counts, and per-planet solar panel to accumulator ratios.">
 <style>
   :root {
     --bg: #1b1a1b;
@@ -60,8 +60,10 @@
     border-color: var(--orange);
     background: var(--panel);
   }
-  body[data-mode="nuclear"] .fusion-only { display: none; }
-  body[data-mode="fusion"] .nuclear-only { display: none; }
+  body[data-mode="nuclear"] .fusion-only, body[data-mode="nuclear"] .solar-only,
+  body[data-mode="fusion"] .nuclear-only, body[data-mode="fusion"] .solar-only,
+  body[data-mode="solar"] .nuclear-only, body[data-mode="solar"] .fusion-only,
+  body[data-mode="solar"] .reactor-only { display: none; }
 
   .panels {
     display: grid;
@@ -219,16 +221,17 @@
 </head>
 <body>
 <main>
-  <h1>Factorio Nuclear &amp; Fusion Power Calculator</h1>
+  <h1>Factorio Nuclear, Fusion &amp; Solar Power Calculator</h1>
   <p class="subtitle">For Factorio 2.x · quality tiers from Space Age · exact ratios, no over-provisioning</p>
 
   <div class="tabs" role="tablist" aria-label="Power technology">
     <button class="tab" id="tab-nuclear" role="tab" aria-selected="true" type="button">Nuclear</button>
     <button class="tab" id="tab-fusion" role="tab" aria-selected="false" type="button">Fusion</button>
+    <button class="tab" id="tab-solar" role="tab" aria-selected="false" type="button">Solar</button>
   </div>
 
   <div class="panels">
-    <section class="panel">
+    <section class="panel reactor-only">
       <h2>Reactor layout</h2>
       <div class="controls-row">
         <div>
@@ -276,6 +279,24 @@
         <label for="q-cryoPlant">Cryogenic plants</label>
         <select id="q-cryoPlant" data-component></select>
       </div>
+      <div class="quality-grid solar-only">
+        <label for="q-solarPanel">Solar panels</label>
+        <select id="q-solarPanel" data-component></select>
+        <label for="q-accumulator">Accumulators</label>
+        <select id="q-accumulator" data-component></select>
+      </div>
+    </section>
+
+    <section class="panel solar-only">
+      <h2>Demand</h2>
+      <div class="controls-row">
+        <div>
+          <label for="target-mw">Target average power (MW)</label>
+          <input type="number" id="target-mw" min="0" max="1000000" step="any" placeholder="optional">
+        </div>
+      </div>
+      <p class="grid-hint">Leave empty to see per-MW figures. Solar output varies by surface;
+        accumulator ratios come from each planet's day/night cycle and solar strength.</p>
     </section>
 
     <section class="panel" id="results-panel">
@@ -296,10 +317,13 @@
 <script>
 (function () {
   const { QUALITY_TIERS, REACTOR_HEAT_OUTPUT, FUSION_REACTOR_PLASMA_OUTPUT,
-          getNeighbourCount, calculateRequirements, calculateFusionRequirements } = NuclearCalc;
+          getNeighbourCount, calculateRequirements, calculateFusionRequirements,
+          calculateSolar } = NuclearCalc;
 
   const MAX_DIM = 20;
-  let mode = location.hash === "#fusion" ? "fusion" : "nuclear";
+  const MODE_HASH = { nuclear: "", fusion: "#fusion", solar: "#solar" };
+  let mode = location.hash === "#fusion" ? "fusion"
+    : location.hash === "#solar" ? "solar" : "nuclear";
   const widthInput = document.getElementById("width");
   const heightInput = document.getElementById("height");
   const gridEl = document.getElementById("grid");
@@ -431,7 +455,60 @@
       </table>`;
   }
 
+  function renderSolarResults() {
+    const targetRaw = Number(document.getElementById("target-mw").value);
+    const targetMw = Number.isFinite(targetRaw) && targetRaw > 0
+      ? Math.min(targetRaw, 1e6) : null;
+    const rows = calculateSolar({
+      panelQuality: qualityFor("solarPanel"),
+      accumulatorQuality: qualityFor("accumulator"),
+      targetMw,
+    });
+
+    const ratioCell = (ratio) => ratio
+      ? `${ratio.panels}:${ratio.accumulators}
+         <small>(${ratio.errorPct >= 0 ? "+" : "−"}${Math.abs(ratio.errorPct).toFixed(2)}%)</small>`
+      : "—";
+    const sameRatio = (a, b) => a && b && a.panels === b.panels && a.accumulators === b.accumulators;
+    const countHead = targetMw !== null
+      ? `<th>Panels</th><th>Accumulators</th>`
+      : `<th>Panels / MW</th><th>Accumulators / MW</th>`;
+
+    let anyFlowLimited = false;
+    const body = rows.map((row) => {
+      anyFlowLimited = anyFlowLimited || row.flowLimited;
+      const exact = row.exactRatio
+        ? `${row.exactRatio[0]}:${row.exactRatio[1]}${row.flowLimited ? " *" : ""}` : "—";
+      const counts = targetMw !== null
+        ? `<td class="num">${row.panels.toLocaleString()}</td>
+           <td class="num">${row.accumulators.toLocaleString()}</td>`
+        : `<td class="num">${(row.panelsPerMw[0] / row.panelsPerMw[1]).toFixed(2)}</td>
+           <td class="num">${(row.accumulatorsPerMw[0] / row.accumulatorsPerMw[1]).toFixed(2)}</td>`;
+      return `<tr><td>${row.label}</td>
+        <td class="num">${row.solarPercent}%</td>
+        <td class="num">${(row.avgKwPerPanel[0] / row.avgKwPerPanel[1]).toFixed(1)}</td>
+        <td>${ratioCell(row.simpleRatio)}</td>
+        <td>${sameRatio(row.simpleRatio, row.preciseRatio)
+          ? '<span class="note">same</span>' : ratioCell(row.preciseRatio)}</td>
+        <td>${exact}</td>${counts}</tr>`;
+    }).join("");
+
+    resultsEl.innerHTML = `
+      <div style="overflow-x:auto"><table>
+        <tr><th>Surface</th><th>Solar</th><th>Avg kW/panel</th>
+            <th>Simple ratio</th><th>Precise ratio</th><th>Exact ratio</th>${countHead}</tr>
+        ${body}
+      </table></div>
+      <p class="grid-hint">Ratios are panels : accumulators for constant average power through
+        the night. Space platforms have no night, so accumulators aren't needed for solar.
+        ${anyFlowLimited ? "<br>* accumulator count set by discharge speed, not capacity." : ""}</p>`;
+  }
+
   function renderResults() {
+    if (mode === "solar") {
+      renderSolarResults();
+      return;
+    }
     const layout = currentLayout();
     const reactorCount = layout.flat().filter(Boolean).length;
     if (reactorCount === 0) {
@@ -461,14 +538,16 @@
     for (const tab of document.querySelectorAll(".tab")) {
       tab.setAttribute("aria-selected", String(tab.id === "tab-" + mode));
     }
-    if (location.hash !== (mode === "fusion" ? "#fusion" : "")) {
-      history.replaceState(null, "", mode === "fusion" ? "#fusion" : location.pathname);
+    if (location.hash !== MODE_HASH[mode]) {
+      history.replaceState(null, "", MODE_HASH[mode] || location.pathname);
     }
     update();
   }
 
   document.getElementById("tab-nuclear").addEventListener("click", () => setMode("nuclear"));
   document.getElementById("tab-fusion").addEventListener("click", () => setMode("fusion"));
+  document.getElementById("tab-solar").addEventListener("click", () => setMode("solar"));
+  document.getElementById("target-mw").addEventListener("input", renderResults);
 
   populateSelect(document.getElementById("q-all"));
   for (const select of document.querySelectorAll("select[data-component]")) {
