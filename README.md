@@ -129,8 +129,7 @@ the fluoroketone-cooling recipe (10 hot → 10 cold in 5 s, no productivity).
   parallel one — reaching **+500%** (five links, with one side left open for a
   fuel inserter) versus +400% for a parallel block. The layout editor models
   each reactor as a 2×2 token and counts its distinct edge-adjacent neighbours
-  from real placement, capped at +500%; reactors boxed in on every side
-  (unreachable for fuel) are flagged.
+  from real placement, capped at +500%.
 
 Unlike nuclear, fusion machine counts are **not** quality-invariant under
 mixed quality: reactor output and generator capacity are different stats, so

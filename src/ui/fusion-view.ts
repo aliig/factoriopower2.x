@@ -11,7 +11,7 @@ import {
 } from "../core/fusion";
 import type { AppState, Store } from "../state/store";
 import { FUSION_GRID } from "../state/store";
-import { bindNumberInput, clampInt, emptyHint, formatPower, powerLine, resultsTable, setWarning } from "./components";
+import { bindNumberInput, clampInt, emptyHint, formatPower, powerLine, resultsTable } from "./components";
 
 const FZ_CELL = 22; // fine-grid cell size in px; single source of truth for the CSS too
 const FZ_W = FUSION_GRID.cols;
@@ -21,7 +21,6 @@ const MAX_COLS = 12;
 const MAX_ROWS = 9;
 
 const gridEl = document.getElementById("fusion-grid") as HTMLDivElement;
-const warningEl = document.getElementById("fz-warning") as HTMLParagraphElement;
 const liveEl = document.getElementById("fz-live") as HTMLParagraphElement;
 const resultsEl = document.getElementById("results") as HTMLDivElement;
 
@@ -138,19 +137,15 @@ export function initFusionView(store: Store): void {
 function renderEditor(state: AppState): void {
   const links = fusionReactorLinks(state.fusion.reactors);
   gridEl.replaceChildren();
-  let enclosed = 0;
   for (const l of links) {
     const d = document.createElement("div");
-    d.className = "reactor" + (l.enclosed ? " enclosed" : "");
+    d.className = "reactor";
     d.style.setProperty("--r", String(l.r));
     d.style.setProperty("--c", String(l.c));
     d.textContent = "×" + (1 + Math.min(l.links, FUSION_MAX_LINKS));
-    if (l.enclosed) enclosed += 1;
     gridEl.appendChild(d);
   }
   gridEl.appendChild(cursorEl); // replaceChildren wiped it; keep the keyboard cursor alive
-  setWarning(warningEl, enclosed,
-    "boxed in on every side — an inserter can't reach them to load fusion power cells.");
 }
 
 function renderResults(state: AppState): void {

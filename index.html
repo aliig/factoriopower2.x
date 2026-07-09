@@ -91,7 +91,6 @@
              aria-label="Fusion reactor layout editor. Use the arrow keys to move the cursor, Enter or Space to place or remove a reactor."></div>
       </div>
       <p class="sr-only" id="fz-live" aria-live="polite"></p>
-      <p class="grid-warning" id="fz-warning"></p>
       <p class="grid-hint">Each reactor is a 2×2 token. <strong>Click</strong> to place one,
         click a reactor to remove it, or <strong>drag</strong> to paint. With the grid focused,
         the <strong>arrow keys</strong> move a cursor and <strong>Enter</strong> places or
@@ -99,8 +98,7 @@
         cell to stagger it. The number is the plasma multiplier (1 + linked reactors, +100%
         each). Because a reactor has two fluid connections per side, staggered rows link to
         two neighbours per side instead of one — reaching the in-game +500% cap, versus +400%
-        for a parallel block. One side must stay open for a fuel-cell inserter, so reactors
-        boxed in on every side are flagged.</p>
+        for a parallel block.</p>
     </section>
 
     <section class="panel">
@@ -176,9 +174,8 @@
       connections, two per side</strong>, so offsetting a row by one tile lets each side reach
       two different neighbours. A <strong>staggered fusion array</strong> therefore hits the
       in-game <strong>+500% neighbour bonus</strong>, versus +400% for a parallel block. The
-      free-form layout editor places reactors as 2×2 tokens, reads each one's links from real
-      tile adjacency, and flags any reactor boxed in on all sides (an inserter can't reach it
-      to load fusion power cells). It also sizes the fusion generators and the cryogenic
+      free-form layout editor places reactors as 2×2 tokens and reads each one's links from
+      real tile adjacency. It also sizes the fusion generators and the cryogenic
       plants that re-cool the fluoroketone loop.</p>
 
     <h2>Solar panel to accumulator ratios by planet</h2>
