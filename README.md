@@ -15,9 +15,25 @@ quality mix, with optional concrete counts for a target average power.
 
 ## Running it
 
-A static site — `index.html` + `calc.js`, no build step. Open `index.html`
-directly or visit the hosted version above. Nuclear, fusion, and solar live on
-separate tabs (deep links: `#fusion`, `#solar`).
+Visit the hosted version above, or run it locally (requires **Node 22+**):
+
+```sh
+npm install
+npm run dev       # dev server with hot reload
+npm test          # regression tests (Vitest)
+npm run build     # type-check + production build into dist/
+npm run preview   # serve the production build locally
+```
+
+The site is built with Vite + TypeScript and deployed to GitHub Pages by a
+GitHub Actions workflow on every push to `main`
+([.github/workflows/deploy.yml](.github/workflows/deploy.yml)); tests and the
+type-check gate the deployment.
+
+Nuclear, fusion, and solar live on separate tabs (deep links: `#fusion`,
+`#solar`). **Everything you configure — layouts, quality choices, target
+power — is encoded in the URL**, so any build is shareable and survives a
+refresh: copy the address bar and send it.
 
 - **Nuclear** uses a clickable reactor grid, so irregular layouts (rings,
   checkerboards, L-shapes) work, with each reactor's neighbour-bonus multiplier
@@ -30,8 +46,9 @@ separate tabs (deep links: `#fusion`, `#solar`).
 - **Solar** is a per-surface table of panel : accumulator ratios with an
   optional target-power input.
 
-The calculation core (`calc.js`) has no dependencies and its outputs are
-locked down by `test.js` — run `node test.js` (or `npm test`).
+The calculation core (`src/core/`) is dependency-free, UI-free TypeScript;
+its outputs are locked down by the regression tests in `test/` — run
+`npm test`.
 
 ## Compatibility
 
