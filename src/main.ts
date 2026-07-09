@@ -1,17 +1,14 @@
 import "./styles.css";
 import type { QualityTier } from "./core/quality";
-import type { AppState, Mode } from "./state/store";
-import { QUALITY_COMPONENTS, createStore, defaultState } from "./state/store";
+import type { AppState } from "./state/store";
+import { QUALITY_COMPONENTS, createStore } from "./state/store";
+import { parseHash, serializeHash } from "./state/url";
 import { populateQualitySelect } from "./ui/components";
 import { initNuclearView, renderNuclearView } from "./ui/nuclear-view";
 import { initFusionView, renderFusionView } from "./ui/fusion-view";
 import { initSolarView, renderSolarView } from "./ui/solar-view";
 
-const MODE_HASH: Record<Mode, string> = { nuclear: "", fusion: "#fusion", solar: "#solar" };
-
-const initialMode: Mode = location.hash === "#fusion" ? "fusion"
-  : location.hash === "#solar" ? "solar" : "nuclear";
-const store = createStore(defaultState(initialMode));
+const store = createStore(parseHash(location.hash));
 
 for (const mode of ["nuclear", "fusion", "solar"] as const) {
   document.getElementById("tab-" + mode)!.addEventListener("click", () => store.set({ mode }));
@@ -53,11 +50,26 @@ function render(state: AppState): void {
   if (state.mode === "nuclear") renderNuclearView(state);
   else if (state.mode === "fusion") renderFusionView(state);
   else renderSolarView(state);
-
-  if (location.hash !== MODE_HASH[state.mode]) {
-    history.replaceState(null, "", MODE_HASH[state.mode] || location.pathname);
-  }
 }
 
+// Reflect state into the URL so any configuration is shareable. Throttled to
+// one write per frame so drag-painting doesn't spam history.replaceState
+// (which also never fires hashchange, so there is no feedback loop).
+let urlRaf: number | null = null;
+function syncUrl(): void {
+  if (urlRaf !== null) return;
+  urlRaf = requestAnimationFrame(() => {
+    urlRaf = null;
+    const hash = serializeHash(store.get());
+    if (location.hash !== hash) {
+      history.replaceState(null, "", hash || location.pathname + location.search);
+    }
+  });
+}
+
+// Pasted URLs and back/forward re-parse the fragment wholesale.
+window.addEventListener("hashchange", () => store.set(parseHash(location.hash)));
+
 store.subscribe(render);
+store.subscribe(syncUrl);
 render(store.get());

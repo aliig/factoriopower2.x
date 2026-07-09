@@ -8,6 +8,10 @@ export type Mode = "nuclear" | "fusion" | "solar";
 // shrinking and re-growing the dimensions preserves toggled cells.
 export const MAX_DIM = 20;
 
+// Fine-grid dimensions of the fusion layout editor, in cells. Shared by the
+// editor view and the URL codec (which validates token bounds against them).
+export const FUSION_GRID = { rows: 18, cols: 26 };
+
 export const QUALITY_COMPONENTS = [
   "reactor",
   "heatExchanger",
