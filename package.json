@@ -1,0 +1,9 @@
+{
+  "name": "factoriopower2.x",
+  "version": "1.0.0",
+  "description": "Factorio Power Planner — nuclear, fusion, and solar power calculator for Factorio 2.x with Space Age quality support.",
+  "scripts": {
+    "test": "node test.js"
+  },
+  "license": "MIT"
+}

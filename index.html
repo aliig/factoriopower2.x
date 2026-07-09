@@ -3,8 +3,40 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Factorio Nuclear, Fusion &amp; Solar Power Calculator</title>
+<title>Factorio Power Planner — Nuclear, Fusion &amp; Solar Calculator</title>
 <meta name="description" content="Interactive nuclear, fusion, and solar power calculator for Factorio 2.x with Space Age quality support. Plan reactor layouts, get exact machine counts, and per-planet solar panel to accumulator ratios.">
+<meta name="theme-color" content="#1b1a1b">
+<link rel="canonical" href="https://aliig.github.io/factoriopower2.x/">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
+
+<!-- Open Graph / social link previews (Reddit, Discord, forums) -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Factorio Power Planner">
+<meta property="og:title" content="Factorio Power Planner — Nuclear, Fusion &amp; Solar Calculator">
+<meta property="og:description" content="Exact machine counts for Factorio power: nuclear reactor grids, fusion layouts with the +500% neighbour bonus, and per-planet solar panel : accumulator ratios. Space Age quality supported.">
+<meta property="og:url" content="https://aliig.github.io/factoriopower2.x/">
+<meta property="og:image" content="https://aliig.github.io/factoriopower2.x/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Factorio Power Planner — Nuclear, Fusion &amp; Solar Calculator">
+<meta name="twitter:description" content="Exact machine counts for nuclear, fusion, and solar power in Factorio 2.x (Space Age quality supported).">
+<meta name="twitter:image" content="https://aliig.github.io/factoriopower2.x/og-image.png">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "Factorio Power Planner",
+  "url": "https://aliig.github.io/factoriopower2.x/",
+  "description": "Nuclear, fusion, and solar power calculator for Factorio 2.x with Space Age quality support.",
+  "applicationCategory": "GameApplication",
+  "operatingSystem": "Any",
+  "browserRequirements": "Requires JavaScript",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+  "about": { "@type": "VideoGame", "name": "Factorio" }
+}
+</script>
 <style>
   :root {
     --bg: #1b1a1b;
@@ -62,8 +94,7 @@
   }
   body[data-mode="nuclear"] .fusion-only, body[data-mode="nuclear"] .solar-only,
   body[data-mode="fusion"] .nuclear-only, body[data-mode="fusion"] .solar-only,
-  body[data-mode="solar"] .nuclear-only, body[data-mode="solar"] .fusion-only,
-  body[data-mode="solar"] .reactor-only { display: none; }
+  body[data-mode="solar"] .nuclear-only, body[data-mode="solar"] .fusion-only { display: none; }
 
   .panels {
     display: grid;
@@ -171,6 +202,50 @@
   }
   .grid-warning.active { display: block; }
 
+  /* Free-form fusion layout editor: 2x2 reactor tokens on a fine cell grid. */
+  #fusion-panel { grid-column: 1 / -1; }
+  .fusion-scroll { max-width: 100%; overflow: auto; }
+  #fusion-grid {
+    position: relative;
+    background-color: #1a191a;
+    background-image:
+      linear-gradient(to right, #2c2b2c 1px, transparent 1px),
+      linear-gradient(to bottom, #2c2b2c 1px, transparent 1px);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    cursor: crosshair;
+    touch-action: none;
+    user-select: none;
+  }
+  .reactor {
+    position: absolute;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    border: 1px solid #c86fb0;
+    background: linear-gradient(#4a2d44, #3a2136);
+    color: #f0c8e6;
+    font-size: 0.8rem;
+    font-weight: 600;
+    pointer-events: none;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.3);
+  }
+  .reactor.enclosed {
+    border-color: #c9302c;
+    background: linear-gradient(#5a3d3d, #452d2d);
+    color: #e3b6b6;
+  }
+  .reactor.enclosed::after {
+    content: "⚠";
+    position: absolute;
+    top: 0;
+    right: 2px;
+    font-size: 0.7rem;
+    color: #ffcc00;
+  }
+
   .quality-grid {
     display: grid;
     grid-template-columns: auto 1fr;
@@ -211,6 +286,24 @@
   td.note { color: var(--text-dim); font-size: 0.85rem; }
   .empty-hint { color: var(--text-dim); font-style: italic; }
 
+  .content {
+    margin-top: 36px;
+    border-top: 1px solid var(--border);
+    padding-top: 4px;
+  }
+  .content h2 {
+    color: var(--orange);
+    font-size: 1.15rem;
+    margin: 26px 0 8px;
+  }
+  .content h3 {
+    color: var(--text);
+    font-size: 1rem;
+    margin: 18px 0 4px;
+  }
+  .content p { margin: 0 0 10px; }
+  .content a { color: var(--orange-dim); }
+
   footer {
     margin-top: 28px;
     color: var(--text-dim);
@@ -221,7 +314,7 @@
 </head>
 <body>
 <main>
-  <h1>Factorio Nuclear, Fusion &amp; Solar Power Calculator</h1>
+  <h1>Factorio Power Planner</h1>
   <p class="subtitle">For Factorio 2.x · quality tiers from Space Age · exact ratios, no over-provisioning</p>
 
   <div class="tabs" role="tablist" aria-label="Power technology">
@@ -231,7 +324,7 @@
   </div>
 
   <div class="panels">
-    <section class="panel reactor-only">
+    <section class="panel nuclear-only">
       <h2>Reactor layout</h2>
       <div class="controls-row">
         <div>
@@ -247,12 +340,37 @@
       </div>
       <div id="grid" role="grid" aria-label="Reactor layout grid"></div>
       <p class="grid-warning" id="grid-warning"></p>
-      <p class="grid-hint">Click cells to toggle reactors. Each cell shows its
-        <span class="nuclear-only">heat</span><span class="fusion-only">plasma</span> multiplier
-        (1 + adjacent reactors from the +100% neighbour bonus).</p>
-      <p class="grid-hint fusion-only">Fusion reactors link through shared fluid connections
-        (two per side), so staggered layouts can reach up to +500% in-game; this grid only
-        models directly adjacent reactors.</p>
+      <p class="grid-hint">Click cells to toggle reactors. Each cell shows its heat multiplier
+        (1 + adjacent reactors from the +100% neighbour bonus). Nuclear reactors link by
+        shared edges, so a solid rectangle is optimal.</p>
+    </section>
+
+    <section class="panel fusion-only" id="fusion-panel">
+      <h2>Reactor layout</h2>
+      <div class="controls-row">
+        <div>
+          <label for="fz-cols">Columns</label>
+          <input type="number" id="fz-cols" min="1" max="12" value="4">
+        </div>
+        <div>
+          <label for="fz-rows">Rows</label>
+          <input type="number" id="fz-rows" min="1" max="9" value="4">
+        </div>
+        <button id="fz-parallel" type="button">Fill parallel</button>
+        <button id="fz-staggered" type="button">Fill staggered</button>
+        <button id="fz-clear" type="button">Clear</button>
+      </div>
+      <div class="fusion-scroll">
+        <div id="fusion-grid" role="application" aria-label="Fusion reactor layout editor"></div>
+      </div>
+      <p class="grid-warning" id="fz-warning"></p>
+      <p class="grid-hint">Each reactor is a 2×2 token. <strong>Click</strong> to place one,
+        click a reactor to remove it, or <strong>drag</strong> to paint. Offset a row by one
+        cell to stagger it. The number is the plasma multiplier (1 + linked reactors, +100%
+        each). Because a reactor has two fluid connections per side, staggered rows link to
+        two neighbours per side instead of one — reaching the in-game +500% cap, versus +400%
+        for a parallel block. One side must stay open for a fuel-cell inserter, so reactors
+        boxed in on every side are flagged.</p>
     </section>
 
     <section class="panel">
@@ -305,6 +423,58 @@
     </section>
   </div>
 
+  <section class="content">
+    <h2>About the Factorio Power Planner</h2>
+    <p>A free, browser-based <strong>power calculator for Factorio 2.x</strong>, updated for
+      the <strong>Space Age</strong> expansion and its quality tiers. It turns a reactor
+      layout — or a target power figure — into the exact machine counts you need, with no
+      over-provisioning, across three technologies: <strong>nuclear</strong>,
+      <strong>fusion</strong>, and <strong>solar</strong>. Every base number comes straight
+      from the game's prototype data (data.raw), so the ratios match what you build in-game.</p>
+
+    <h2>Nuclear reactor ratios</h2>
+    <p>Draw a layout on the reactor grid and the planner sizes the heat exchangers, steam
+      turbines, offshore pumps, and fuel-cell consumption. Each reactor makes its base 40 MW
+      of heat plus <strong>+100% for every directly adjacent reactor</strong> (the neighbour
+      bonus), so a 2×2 block produces 4 × 40 × (1 + 2) = <strong>480 MW</strong> and needs 48
+      heat exchangers and 83 steam turbines at normal quality. Because quality scales every
+      machine equally, an all-legendary build uses the same machine counts as an all-normal
+      one but outputs 2.5× the power.</p>
+
+    <h2>Fusion reactor neighbour bonus and staggered layouts</h2>
+    <p>Fusion links differently from nuclear: reactors connect through <strong>shared fluid
+      connections, two per side</strong>, so offsetting a row by one tile lets each side reach
+      two different neighbours. A <strong>staggered fusion array</strong> therefore hits the
+      in-game <strong>+500% neighbour bonus</strong>, versus +400% for a parallel block. The
+      free-form layout editor places reactors as 2×2 tokens, reads each one's links from real
+      tile adjacency, and flags any reactor boxed in on all sides (an inserter can't reach it
+      to load fusion power cells). It also sizes the fusion generators and the cryogenic
+      plants that re-cool the fluoroketone loop.</p>
+
+    <h2>Solar panel to accumulator ratios by planet</h2>
+    <p>Solar is a per-surface planner: the exact <strong>solar panel : accumulator ratio</strong>
+      for every planet and space-platform orbit, at any quality mix. On Nauvis the exact ratio
+      is 2646:3125 — about 0.85 accumulators per panel, or a simple 13:11. That is <em>not</em>
+      the old 21:25 figure, because Factorio 2.0 lengthened the day to seven minutes. Enter a
+      target average power to turn the per-MW ratios into concrete panel and accumulator counts.</p>
+
+    <h2>FAQ</h2>
+    <h3>How many heat exchangers and turbines does a nuclear reactor need?</h3>
+    <p>It depends on the neighbour bonus, not the reactor count alone — which is why the planner
+      works from your actual layout. A 2×2 block (480 MW) needs 48 heat exchangers and 83 steam
+      turbines at normal quality.</p>
+    <h3>Does staggering fusion reactors actually help?</h3>
+    <p>Yes. A parallel block caps each interior reactor at +400%; staggering reaches the +500%
+      practical maximum, so the same reactor count makes more power. Use the Fill parallel and
+      Fill staggered buttons on the Fusion tab to compare.</p>
+    <h3>Is it accurate for the Space Age quality system?</h3>
+    <p>Yes — each machine stat scales by the correct per-tier multiplier (+30% per level, +150%
+      at legendary), including the accumulator's special +100%-per-level capacity.</p>
+    <h3>Which Factorio version is supported?</h3>
+    <p>Factorio 2.0.7 and later. Version 2.0.7 changed the water-to-steam ratio to 1:10, which
+      the offshore-pump math relies on.</p>
+  </section>
+
   <footer>
     Base stats from the game's prototype definitions
     (<a href="https://wiki.factorio.com/Data.raw">data.raw</a>).
@@ -317,8 +487,9 @@
 <script>
 (function () {
   const { QUALITY_TIERS, REACTOR_HEAT_OUTPUT, FUSION_REACTOR_PLASMA_OUTPUT,
+          FUSION_REACTOR_SIZE, FUSION_MAX_LINKS,
           getNeighbourCount, calculateRequirements, calculateFusionRequirements,
-          calculateSolar } = NuclearCalc;
+          fusionReactorLinks, calculateFusionLayout, calculateSolar } = NuclearCalc;
 
   const MAX_DIM = 20;
   const MODE_HASH = { nuclear: "", fusion: "#fusion", solar: "#solar" };
@@ -428,20 +599,23 @@
       </table>`;
   }
 
-  function renderFusionResults(layout) {
-    const req = calculateFusionRequirements(layout, {
+  function renderFusionResults() {
+    const req = calculateFusionLayout(reactors, {
       reactorQuality: qualityFor("fusionReactor"),
       generatorQuality: qualityFor("fusionGenerator"),
       cryoPlantQuality: qualityFor("cryoPlant"),
     });
 
     const perReactor = FUSION_REACTOR_PLASMA_OUTPUT[qualityFor("fusionReactor")];
+    const avgBonus = req.reactors ? (req.sre / req.reactors - 1) * 100 : 0;
     resultsEl.innerHTML = `
       <p class="power-line">${formatPower(req.netPower)}
         <small>net output (${formatPower(req.power)} plasma − ${req.reactorDrain} MW reactor drain)</small></p>
       <table>
         <tr><td>Fusion reactors</td><td class="num">${req.reactors}</td>
             <td class="note">${perReactor} MW plasma each before neighbour bonus</td></tr>
+        <tr><td>Avg neighbour bonus</td><td class="num">+${avgBonus.toFixed(0)}%</td>
+            <td class="note">per reactor across this layout — max +${FUSION_MAX_LINKS * 100}%</td></tr>
         <tr><td>Fusion generators</td><td class="num">${req.generators}</td><td class="note"></td></tr>
         <tr><td>Cryogenic plants</td><td class="num">${req.cryoPlants}</td>
             <td class="note">cooling the fluoroketone loop</td></tr>
@@ -509,18 +683,28 @@
       renderSolarResults();
       return;
     }
+    if (mode === "fusion") {
+      if (reactors.length === 0) {
+        resultsEl.innerHTML = '<p class="empty-hint">No reactors placed — click in the layout editor to add some.</p>';
+        return;
+      }
+      renderFusionResults();
+      return;
+    }
     const layout = currentLayout();
-    const reactorCount = layout.flat().filter(Boolean).length;
-    if (reactorCount === 0) {
+    if (layout.flat().filter(Boolean).length === 0) {
       resultsEl.innerHTML = '<p class="empty-hint">No reactors placed — click cells in the layout grid to add some.</p>';
       return;
     }
-    if (mode === "fusion") renderFusionResults(layout);
-    else renderNuclearResults(layout);
+    renderNuclearResults(layout);
   }
 
   function update() {
-    renderGrid();
+    if (mode === "fusion") {
+      renderFusionEditor(); // renders tokens, then results
+      return;
+    }
+    if (mode === "nuclear") renderGrid();
     renderResults();
   }
 
@@ -568,6 +752,113 @@
   heightInput.addEventListener("input", update);
   document.getElementById("fill").addEventListener("click", () => setAllInRange(true));
   document.getElementById("clear").addEventListener("click", () => setAllInRange(false));
+
+  // --- Fusion layout editor: 2x2 reactor tokens on a fine cell grid ----------
+  const FZ_CELL = 22, FZ_W = 26, FZ_H = 18, FZ_S = FUSION_REACTOR_SIZE;
+  const fusionGridEl = document.getElementById("fusion-grid");
+  let reactors = [];
+  for (let i = 0; i < 4; i++) { // seed a staggered 4x4 so it isn't empty
+    const off = i % 2 ? 1 : 0;
+    for (let j = 0; j < 4; j++) reactors.push({ r: i * FZ_S, c: j * FZ_S + off });
+  }
+  let fzDrag = null; // "place" | "erase" while a pointer is held
+
+  function fzReactorAt(r, c) {
+    return reactors.findIndex((rr) =>
+      r >= rr.r && r < rr.r + FZ_S && c >= rr.c && c < rr.c + FZ_S);
+  }
+  function fzOverlaps(r, c) {
+    return reactors.some((rr) =>
+      r < rr.r + FZ_S && r + FZ_S > rr.r && c < rr.c + FZ_S && c + FZ_S > rr.c);
+  }
+  function fzCellFromEvent(e) {
+    const rect = fusionGridEl.getBoundingClientRect();
+    return {
+      r: Math.floor((e.clientY - rect.top) / FZ_CELL),
+      c: Math.floor((e.clientX - rect.left) / FZ_CELL),
+    };
+  }
+  function fzApply(r, c) {
+    if (r < 0 || c < 0 || r >= FZ_H || c >= FZ_W) return;
+    if (fzDrag === "erase") {
+      const i = fzReactorAt(r, c);
+      if (i >= 0) { reactors.splice(i, 1); renderFusionEditor(); }
+      return;
+    }
+    // Place a token anchored at (r, c), clamped so its 2x2 stays in bounds.
+    const ar = Math.min(r, FZ_H - FZ_S);
+    const ac = Math.min(c, FZ_W - FZ_S);
+    if (fzReactorAt(r, c) < 0 && !fzOverlaps(ar, ac)) {
+      reactors.push({ r: ar, c: ac });
+      renderFusionEditor();
+    }
+  }
+  function fzDims() {
+    const clamp = (id, max) => {
+      const v = Math.floor(Number(document.getElementById(id).value));
+      return Number.isFinite(v) ? Math.min(max, Math.max(1, v)) : 1;
+    };
+    return { cols: clamp("fz-cols", 12), rows: clamp("fz-rows", 9) };
+  }
+  function fzFill(staggered) {
+    const { cols, rows } = fzDims();
+    reactors = [];
+    for (let i = 0; i < rows; i++) {
+      const off = staggered && i % 2 ? 1 : 0;
+      for (let j = 0; j < cols; j++) {
+        const r = i * FZ_S, c = j * FZ_S + off;
+        if (r + FZ_S <= FZ_H && c + FZ_S <= FZ_W) reactors.push({ r, c });
+      }
+    }
+    renderFusionEditor();
+  }
+  function renderFusionEditor() {
+    fusionGridEl.style.width = FZ_W * FZ_CELL + "px";
+    fusionGridEl.style.height = FZ_H * FZ_CELL + "px";
+    fusionGridEl.style.backgroundSize = FZ_CELL + "px " + FZ_CELL + "px";
+    const links = fusionReactorLinks(reactors);
+    fusionGridEl.replaceChildren();
+    let enclosed = 0;
+    for (const l of links) {
+      const d = document.createElement("div");
+      d.className = "reactor" + (l.enclosed ? " enclosed" : "");
+      d.style.left = l.c * FZ_CELL + "px";
+      d.style.top = l.r * FZ_CELL + "px";
+      d.style.width = FZ_S * FZ_CELL + "px";
+      d.style.height = FZ_S * FZ_CELL + "px";
+      d.textContent = "×" + (1 + Math.min(l.links, FUSION_MAX_LINKS));
+      if (l.enclosed) enclosed += 1;
+      fusionGridEl.appendChild(d);
+    }
+    const warning = document.getElementById("fz-warning");
+    warning.classList.toggle("active", enclosed > 0);
+    warning.textContent = enclosed > 0
+      ? `⚠ ${enclosed} reactor${enclosed > 1 ? "s are" : " is"} boxed in on every side — `
+        + "an inserter can't reach them to load fusion power cells."
+      : "";
+    renderResults();
+  }
+
+  fusionGridEl.addEventListener("pointerdown", (e) => {
+    e.preventDefault();
+    const { r, c } = fzCellFromEvent(e);
+    if (r < 0 || c < 0 || r >= FZ_H || c >= FZ_W) return;
+    fzDrag = fzReactorAt(r, c) >= 0 ? "erase" : "place";
+    fusionGridEl.setPointerCapture(e.pointerId);
+    fzApply(r, c);
+  });
+  fusionGridEl.addEventListener("pointermove", (e) => {
+    if (!fzDrag) return;
+    const { r, c } = fzCellFromEvent(e);
+    fzApply(r, c);
+  });
+  const fzEndDrag = () => { fzDrag = null; };
+  fusionGridEl.addEventListener("pointerup", fzEndDrag);
+  fusionGridEl.addEventListener("pointercancel", fzEndDrag);
+
+  document.getElementById("fz-parallel").addEventListener("click", () => fzFill(false));
+  document.getElementById("fz-staggered").addEventListener("click", () => fzFill(true));
+  document.getElementById("fz-clear").addEventListener("click", () => { reactors = []; renderFusionEditor(); });
 
   setMode(mode);
 })();

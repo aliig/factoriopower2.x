@@ -1,5 +1,5 @@
-// Calculation core, ported from main.py. UI-free so it runs in the browser
-// (globals via window.NuclearCalc) and in Node (module.exports) for tests.
+// Calculation core. UI-free so it runs in the browser (global NuclearCalc)
+// and in Node (module.exports) for the regression tests in test.js.
 
 // Quality strengths are 0/1/2/3/5 and stats gain +30% per strength level
 // (https://wiki.factorio.com/Quality), i.e. x1.0/1.3/1.6/1.9/2.5. Multipliers
@@ -219,15 +219,53 @@ function calculateRequirements(layout, {
   };
 }
 
-function calculateFusionRequirements(layout, {
+// A fusion reactor is a 2x2 token on the fine layout grid. Each 2-cell edge is
+// the reactor's "two fluid connections per side": offsetting a row by one cell
+// makes those two cells face two *different* reactors, which is exactly why a
+// staggered array links more (and reaches the +500% ceiling) than a parallel
+// one. Links are counted from real tile adjacency below.
+const FUSION_REACTOR_SIZE = 2; // token footprint, in fine grid cells
+// +100% per linked reactor, but you must leave one adjacent tile open for a
+// fuel-cell inserter, so the practical maximum is +500% (5 links).
+const FUSION_MAX_LINKS = 5;
+
+function fusionReactorLinks(reactors) {
+  // reactors: array of { r, c } top-left anchors of 2x2 tokens on the grid.
+  // Returns, per reactor, the count of *distinct* other reactors occupying a
+  // cell edge-adjacent to its footprint, and whether it is enclosed (no open
+  // adjacent tile, so an inserter can't reach it to load fuel cells).
+  const S = FUSION_REACTOR_SIZE;
+  const owner = new Map(); // "r,c" -> reactor index
+  const key = (r, c) => r + "," + c;
+  reactors.forEach((rr, idx) => {
+    for (let dr = 0; dr < S; dr++) {
+      for (let dc = 0; dc < S; dc++) owner.set(key(rr.r + dr, rr.c + dc), idx);
+    }
+  });
+  return reactors.map((rr, idx) => {
+    const perimeter = [];
+    for (let d = 0; d < S; d++) {
+      perimeter.push([rr.r - 1, rr.c + d]); // top
+      perimeter.push([rr.r + S, rr.c + d]); // bottom
+      perimeter.push([rr.r + d, rr.c - 1]); // left
+      perimeter.push([rr.r + d, rr.c + S]); // right
+    }
+    const neighbours = new Set();
+    let openCells = 0;
+    for (const [pr, pc] of perimeter) {
+      const o = owner.get(key(pr, pc));
+      if (o === undefined) openCells += 1;
+      else if (o !== idx) neighbours.add(o);
+    }
+    return { r: rr.r, c: rr.c, links: neighbours.size, enclosed: openCells === 0 };
+  });
+}
+
+function fusionRequirements(reactorCount, sre, {
   reactorQuality = "normal",
   generatorQuality = "normal",
   cryoPlantQuality = "normal",
-  neighbouringBonus = 1,
 } = {}) {
-  const reactorCount = layout.flat().filter(Boolean).length;
-  const sre = calculateSRE(layout, neighbouringBonus);
-
   const reactorOutput = FUSION_REACTOR_PLASMA_OUTPUT[reactorQuality];
   const power = sre * reactorOutput; // MW of plasma, == MW of electricity once converted
   const reactorDrain = reactorCount * FUSION_REACTOR_POWER_INPUT[reactorQuality];
@@ -262,11 +300,35 @@ function calculateFusionRequirements(layout, {
   };
 }
 
+// Rectangular-layout entry point: every reactor is fuelled and the neighbour
+// bonus is orthogonal edge-adjacency (the shape a solid block makes). Used by
+// the nuclear-style grid and the tests; the free-form editor path is below.
+function calculateFusionRequirements(layout, options = {}) {
+  const reactorCount = layout.flat().filter(Boolean).length;
+  const sre = calculateSRE(layout, options.neighbouringBonus ?? 1);
+  return fusionRequirements(reactorCount, sre, options);
+}
+
+// Free-form editor entry point: reactors placed anywhere as 2x2 tokens, links
+// read from real tile adjacency and capped at the +500% practical maximum.
+function calculateFusionLayout(reactors, options = {}) {
+  const cap = options.linkCap ?? FUSION_MAX_LINKS;
+  const links = fusionReactorLinks(reactors);
+  const sre = links.reduce((acc, x) => acc + 1 + Math.min(x.links, cap), 0);
+  const req = fusionRequirements(reactors.length, sre, options);
+  return {
+    ...req,
+    sre,
+    links,
+    enclosedCount: links.reduce((n, x) => n + (x.enclosed ? 1 : 0), 0),
+  };
+}
+
 function bestSolarRatio(num, den, smallCap = null, cap = 99) {
   // Closest panels:accumulators approximation of the exact accumulators-
   // per-panel ratio num/den (reduced), with both terms <= cap and (for the
   // "simple" ratio) the smaller term <= smallCap. Comparisons use integer
-  // cross-multiplication so this agrees bit for bit with main.py:
+  // cross-multiplication so the search is exact and deterministic:
   // error of a/p is |a*den - p*num| / (p*den), so a/p beats a'/p' iff
   // |a*den - p*num| * p' < |a'*den - p'*num| * p. Ties prefer smaller
   // p+a, then p.
@@ -367,9 +429,9 @@ function calculateSolarSurface(surface, {
   };
 
   if (targetMw !== null) {
-    // floor(x*1000 + 0.5) rather than Math.round so JS and Python agree
-    // (Math.round vs banker's rounding). Counts are each ceiled
-    // independently off the exact target flow, per the usual rule.
+    // floor(x*1000 + 0.5) gives explicit round-half-up on the MW target.
+    // Counts are each ceiled independently off the exact target flow, per
+    // the usual rule.
     const targetKw = Math.floor(targetMw * 1000 + 0.5);
     result.panels = ceilDiv(targetKw * avgKw[1], avgKw[0]);
     result.accumulators = ceilDiv(targetKw * accumulatorsPerMw[0],
@@ -392,11 +454,15 @@ const NuclearCalc = {
   OFFSHORE_PUMP_OUTPUT,
   FUSION_REACTOR_PLASMA_OUTPUT,
   FUSION_GENERATOR_OUTPUT,
+  FUSION_REACTOR_SIZE,
+  FUSION_MAX_LINKS,
   SOLAR_SURFACES,
   getNeighbourCount,
   calculateSRE,
   calculateRequirements,
   calculateFusionRequirements,
+  fusionReactorLinks,
+  calculateFusionLayout,
   calculateSolar,
 };
 

@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://aliig.github.io/factoriopower2.x/sitemap.xml

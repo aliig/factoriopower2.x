@@ -1,11 +1,11 @@
-# factoriopower2.x
+# Factorio Power Planner
 
 Nuclear, **fusion, and solar** power calculator for **Factorio 2.0.7 and
 later**, with quality support from the **Space Age** expansion.
 
 **Try it in your browser: <https://aliig.github.io/factoriopower2.x/>**
 
-Given an `x` by `y` grid of reactors, computes everything needed to convert
+Given a reactor layout, computes everything needed to convert
 their output into electricity: for nuclear, heat exchangers, steam turbines,
 and offshore pumps; for fusion, fusion generators and cryogenic plants for
 the fluoroketone coolant loop — plus fuel cell consumption for both. The
@@ -13,16 +13,25 @@ solar mode is a per-surface planner instead: exact solar panel :
 accumulator ratios for every planet (and space platform orbit), at any
 quality mix, with optional concrete counts for a target average power.
 
-## Web version
+## Running it
 
-The interactive version (`index.html` + `calc.js`, no build step) goes beyond
-the CLI: cells in the reactor grid are clickable, so irregular layouts
-(rings, checkerboards, L-shapes) are supported, with each reactor's neighbour
-bonus multiplier shown in place. Nuclear, fusion, and solar live on separate
-tabs (deep links: `#fusion`, `#solar`); nuclear and fusion share the layout
-grid, while solar shows the per-surface ratio table with an optional target
-power input. `parity_check.py` verifies the JavaScript port produces
-identical results to the Python implementation.
+A static site — `index.html` + `calc.js`, no build step. Open `index.html`
+directly or visit the hosted version above. Nuclear, fusion, and solar live on
+separate tabs (deep links: `#fusion`, `#solar`).
+
+- **Nuclear** uses a clickable reactor grid, so irregular layouts (rings,
+  checkerboards, L-shapes) work, with each reactor's neighbour-bonus multiplier
+  shown in place.
+- **Fusion** has a free-form layout editor: reactors are 2×2 tokens you place,
+  drag, and offset. Because a fusion reactor links through fluid connections
+  (two per side), staggering rows reaches the in-game **+500%** neighbour cap
+  that a parallel block (+400%) can't — the editor reads each reactor's links
+  straight from tile adjacency. See [the fusion math](#the-math-fusion).
+- **Solar** is a per-surface table of panel : accumulator ratios with an
+  optional target-power input.
+
+The calculation core (`calc.js`) has no dependencies and its outputs are
+locked down by `test.js` — run `node test.js` (or `npm test`).
 
 ## Compatibility
 
@@ -36,27 +45,8 @@ identical results to the Python implementation.
   current data.raw (wube/factorio-data master, Factorio 2.1.x); 2.1.0 made
   no fusion balance changes, so 2.0 values match too.
 
-## Usage
-
-```
-python main.py -x 2 -y 2
-python main.py -x 2 -y 2 -q legendary
-python main.py -x 2 -y 2 --reactor-quality legendary --turbine-quality rare
-python main.py --mode fusion -x 2 -y 2
-python main.py --mode fusion -x 2 -y 2 --reactor-quality legendary --cryo-plant-quality rare
-python main.py --mode solar
-python main.py --mode solar --panel-quality legendary --accumulator-quality normal --power 100
-```
-
-`--mode` picks the technology (`nuclear`, the default, `fusion`, or `solar`).
-`-q/--quality` sets the quality tier for all components; the per-component
-flags (`--reactor-quality`, `--heat-exchanger-quality`, `--turbine-quality`,
-`--pump-quality` for nuclear; `--reactor-quality`, `--generator-quality`,
-`--cryo-plant-quality` for fusion; `--panel-quality`,
-`--accumulator-quality` for solar) override it individually. Tiers: `normal`,
-`uncommon`, `rare`, `epic`, `legendary`. Solar ignores `-x/-y` (there is no
-layout) and accepts `--power MW` to turn the per-MW table into concrete
-panel and accumulator counts.
+Quality tiers (`normal`, `uncommon`, `rare`, `epic`, `legendary`) are chosen
+per component, with an "All components" master selector that sets them at once.
 
 ## The math
 
@@ -83,10 +73,10 @@ cell `fuel_value = "8GJ"`, steam `heat_capacity = "0.2kJ"`/°C, water
 - Fuel cells (8 GJ each) burn at the reactor's **base** consumption rate —
   the neighbour bonus is free heat. A normal reactor burns one cell per 200 s.
 
-All intermediate flows are computed as exact rationals (`fractions.Fraction`);
-the only rounding anywhere is the final round-up per machine type, applied to
-the exact steady-state flow rather than to another machine's rounded-up count
-(which would over-provision).
+All intermediate flows are computed as exact integer ratios; the only rounding
+anywhere is the final round-up per machine type, applied to the exact
+steady-state flow rather than to another machine's rounded-up count (which
+would over-provision).
 
 ## The math (fusion)
 
@@ -101,9 +91,9 @@ the fluoroketone-cooling recipe (10 hot → 10 cold in 5 s, no productivity).
 
 - One plasma unit at the base 1,000,000 °C carries 25 MJ, so a reactor
   converting coolant to plasma 1:1 at 4/s outputs **100 MW**. The neighbour
-  bonus (+100% per directly adjacent reactor, same grid model as nuclear)
-  raises the plasma's *temperature*, not its volume — bonus energy is free,
-  and the fluid loop rate never changes.
+  bonus (+100% per linked reactor — see the layout note below) raises the
+  plasma's *temperature*, not its volume — bonus energy is free, and the fluid
+  loop rate never changes.
 - Generators convert plasma losslessly (a generator consumes `2×q` plasma/s
   and outputs `50×q` MW — the 25 MJ/unit ratio is quality-invariant), so
   **generators = ⌈plasma MW / generator MW⌉** and electric output equals
@@ -116,9 +106,14 @@ the fluoroketone-cooling recipe (10 hot → 10 cold in 5 s, no productivity).
 - Fusion power cells (40 GJ) burn at the base output rate — one per 400 s
   per normal reactor — and **only on demand**: unlike nuclear there is no
   idle burn, so this is the consumption at full load.
-- In-game, fusion reactors link through shared fluid connections (two per
-  side), so staggered layouts can exceed four linked neighbours and reach
-  +500%; the simple grid here models directly adjacent reactors only.
+- Fusion reactors link through **shared fluid connections (two per side)**,
+  not shared edges: offsetting a row by one tile makes those two connections
+  face two different neighbours, so a staggered array links more than a
+  parallel one — reaching **+500%** (five links, with one side left open for a
+  fuel inserter) versus +400% for a parallel block. The layout editor models
+  each reactor as a 2×2 token and counts its distinct edge-adjacent neighbours
+  from real placement, capped at +500%; reactors boxed in on every side
+  (unreachable for fuel) are flagged.
 
 Unlike nuclear, fusion machine counts are **not** quality-invariant under
 mixed quality: reactor output and generator capacity are different stats, so
@@ -203,5 +198,5 @@ build uses the same machine *counts* as an all-normal one but produces 2.5x
 the power — and burns fuel cells 2.5x as fast (one per 80 s per reactor).
 The same holds for an all-same-quality fusion build, but note the fractional
 coolant rates at intermediate tiers (5.2/s is not a whole number): the code
-keeps these as exact rationals (Python `Fraction`s / integer tenths in JS)
-so no rounding creeps in before the final machine-count round-up.
+keeps these as exact integer tenths so no rounding creeps in before the final
+machine-count round-up.
