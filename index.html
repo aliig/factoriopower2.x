@@ -87,11 +87,15 @@
         <button id="fz-clear" type="button">Clear</button>
       </div>
       <div class="fusion-scroll">
-        <div id="fusion-grid" role="application" aria-label="Fusion reactor layout editor"></div>
+        <div id="fusion-grid" role="application" tabindex="0"
+             aria-label="Fusion reactor layout editor. Use the arrow keys to move the cursor, Enter or Space to place or remove a reactor."></div>
       </div>
+      <p class="sr-only" id="fz-live" aria-live="polite"></p>
       <p class="grid-warning" id="fz-warning"></p>
       <p class="grid-hint">Each reactor is a 2×2 token. <strong>Click</strong> to place one,
-        click a reactor to remove it, or <strong>drag</strong> to paint. Offset a row by one
+        click a reactor to remove it, or <strong>drag</strong> to paint. With the grid focused,
+        the <strong>arrow keys</strong> move a cursor and <strong>Enter</strong> places or
+        removes a reactor. Offset a row by one
         cell to stagger it. The number is the plasma multiplier (1 + linked reactors, +100%
         each). Because a reactor has two fluid connections per side, staggered rows link to
         two neighbours per side instead of one — reaching the in-game +500% cap, versus +400%

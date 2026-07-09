@@ -18,6 +18,8 @@ function currentLayout(state: AppState): Layout {
 export function initNuclearView(store: Store): void {
   const widthInput = document.getElementById("width") as HTMLInputElement;
   const heightInput = document.getElementById("height") as HTMLInputElement;
+  widthInput.value = String(store.get().nuclear.width);
+  heightInput.value = String(store.get().nuclear.height);
 
   bindNumberInput(widthInput, 1, MAX_DIM, (width) =>
     store.set({ nuclear: { ...store.get().nuclear, width } }));
@@ -46,11 +48,33 @@ export function initNuclearView(store: Store): void {
     next[r][c] = !next[r][c];
     store.set({ nuclear: { ...store.get().nuclear, backing: next } });
   });
+
+  // Arrow keys move focus between the cell buttons.
+  gridEl.addEventListener("keydown", (e) => {
+    const cell = (e.target as HTMLElement).closest<HTMLButtonElement>("button.cell");
+    if (!cell) return;
+    let r = Number(cell.dataset.r);
+    let c = Number(cell.dataset.c);
+    if (e.key === "ArrowUp") r -= 1;
+    else if (e.key === "ArrowDown") r += 1;
+    else if (e.key === "ArrowLeft") c -= 1;
+    else if (e.key === "ArrowRight") c += 1;
+    else return;
+    e.preventDefault();
+    const { width, height } = store.get().nuclear;
+    if (r < 0 || c < 0 || r >= height || c >= width) return;
+    gridEl.querySelector<HTMLButtonElement>(`[data-r="${r}"][data-c="${c}"]`)?.focus();
+  });
 }
 
 function renderGrid(state: AppState): void {
   const layout = currentLayout(state);
   const { width, height } = state.nuclear;
+  // Rebuilding the cells drops focus; remember which cell had it so keyboard
+  // toggling (Enter/Space on a cell) doesn't dump focus back to the body.
+  const active = document.activeElement instanceof HTMLElement && gridEl.contains(document.activeElement)
+    ? { r: (document.activeElement as HTMLElement).dataset.r, c: (document.activeElement as HTMLElement).dataset.c }
+    : null;
   gridEl.style.gridTemplateColumns = `repeat(${width}, 42px)`;
   gridEl.replaceChildren();
   let blockedCount = 0;
@@ -73,6 +97,9 @@ function renderGrid(state: AppState): void {
           : "empty"));
       gridEl.appendChild(cell);
     }
+  }
+  if (active) {
+    gridEl.querySelector<HTMLButtonElement>(`[data-r="${active.r}"][data-c="${active.c}"]`)?.focus();
   }
   setWarning(warningEl, blockedCount,
     "enclosed on all four sides — inserters can't reach them to insert fuel cells.");

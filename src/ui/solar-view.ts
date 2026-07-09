@@ -10,10 +10,18 @@ const MAX_TARGET_MW = 1e6;
 
 export function initSolarView(store: Store): void {
   const targetInput = document.getElementById("target-mw") as HTMLInputElement;
+  const boot = store.get().solar.targetMw;
+  if (boot !== null) targetInput.value = String(boot);
   targetInput.addEventListener("input", () => {
     const raw = Number(targetInput.value);
     const targetMw = Number.isFinite(raw) && raw > 0 ? Math.min(raw, MAX_TARGET_MW) : null;
     store.set({ solar: { targetMw } });
+  });
+  // On blur/Enter, reflect what the app actually used: clamped if too big,
+  // cleared if the entry wasn't a usable power figure.
+  targetInput.addEventListener("change", () => {
+    const targetMw = store.get().solar.targetMw;
+    targetInput.value = targetMw === null ? "" : String(targetMw);
   });
 }
 

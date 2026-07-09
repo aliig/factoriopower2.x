@@ -10,18 +10,32 @@ import {
   fusionReactorLinks,
 } from "../core/fusion";
 import type { AppState, Store } from "../state/store";
+import { FUSION_GRID } from "../state/store";
 import { bindNumberInput, clampInt, emptyHint, formatPower, powerLine, resultsTable, setWarning } from "./components";
 
 const FZ_CELL = 22; // fine-grid cell size in px; single source of truth for the CSS too
-const FZ_W = 26;
-const FZ_H = 18;
+const FZ_W = FUSION_GRID.cols;
+const FZ_H = FUSION_GRID.rows;
 const FZ_S = FUSION_REACTOR_SIZE;
 const MAX_COLS = 12;
 const MAX_ROWS = 9;
 
 const gridEl = document.getElementById("fusion-grid") as HTMLDivElement;
 const warningEl = document.getElementById("fz-warning") as HTMLParagraphElement;
+const liveEl = document.getElementById("fz-live") as HTMLParagraphElement;
 const resultsEl = document.getElementById("results") as HTMLDivElement;
+
+// Keyboard cursor: the anchor cell of the 2x2 token a key press would place
+// or remove. Only visible while the grid has focus (CSS).
+const cursor = { r: 0, c: 0 };
+const cursorEl = document.createElement("div");
+cursorEl.className = "fz-cursor";
+cursorEl.setAttribute("aria-hidden", "true");
+
+function positionCursor(): void {
+  cursorEl.style.setProperty("--r", String(cursor.r));
+  cursorEl.style.setProperty("--c", String(cursor.c));
+}
 
 export function initFusionView(store: Store): void {
   gridEl.style.setProperty("--fz-cell", FZ_CELL + "px");
@@ -79,6 +93,31 @@ export function initFusionView(store: Store): void {
   gridEl.addEventListener("pointerup", endDrag);
   gridEl.addEventListener("pointercancel", endDrag);
 
+  // Keyboard path: arrows move the cursor, Enter/Space places or removes.
+  const announce = (message: string) => { liveEl.textContent = message; };
+  positionCursor();
+  gridEl.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowUp") cursor.r = Math.max(0, cursor.r - 1);
+    else if (e.key === "ArrowDown") cursor.r = Math.min(FZ_H - FZ_S, cursor.r + 1);
+    else if (e.key === "ArrowLeft") cursor.c = Math.max(0, cursor.c - 1);
+    else if (e.key === "ArrowRight") cursor.c = Math.min(FZ_W - FZ_S, cursor.c + 1);
+    else if (e.key === "Enter" || e.key === " ") {
+      const reactors = store.get().fusion.reactors;
+      const i = reactorAt(cursor.r, cursor.c);
+      if (i >= 0) {
+        setReactors(reactors.filter((_, idx) => idx !== i));
+        announce(`Removed reactor at row ${cursor.r + 1}, column ${cursor.c + 1}.`);
+      } else if (!overlaps(cursor.r, cursor.c)) {
+        setReactors([...reactors, { r: cursor.r, c: cursor.c }]);
+        announce(`Placed reactor at row ${cursor.r + 1}, column ${cursor.c + 1}.`);
+      } else {
+        announce("Space occupied — move the cursor to an empty 2 by 2 area.");
+      }
+    } else return;
+    e.preventDefault();
+    positionCursor();
+  });
+
   const dims = () => ({
     cols: clampInt((document.getElementById("fz-cols") as HTMLInputElement).value, 1, MAX_COLS),
     rows: clampInt((document.getElementById("fz-rows") as HTMLInputElement).value, 1, MAX_ROWS),
@@ -109,6 +148,7 @@ function renderEditor(state: AppState): void {
     if (l.enclosed) enclosed += 1;
     gridEl.appendChild(d);
   }
+  gridEl.appendChild(cursorEl); // replaceChildren wiped it; keep the keyboard cursor alive
   setWarning(warningEl, enclosed,
     "boxed in on every side — an inserter can't reach them to load fusion power cells.");
 }

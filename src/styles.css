@@ -214,6 +214,34 @@ button:hover { border-color: var(--orange-dim); color: var(--orange); }
   font-size: 0.7rem;
   color: #ffcc00;
 }
+/* Keyboard cursor for the fusion editor: token-sized, shown while the grid
+   has focus. */
+.fz-cursor {
+  display: none;
+  position: absolute;
+  left: calc(var(--c) * var(--fz-cell));
+  top: calc(var(--r) * var(--fz-cell));
+  width: calc(2 * var(--fz-cell));
+  height: calc(2 * var(--fz-cell));
+  border: 2px dashed var(--orange);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 1;
+}
+#fusion-grid:focus .fz-cursor { display: block; }
+
+/* Visually hidden but available to screen readers (live announcements). */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
 
 .quality-grid {
   display: grid;

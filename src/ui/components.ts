@@ -40,6 +40,9 @@ export function clampInt(raw: string | number, min: number, max: number): number
 }
 
 // Wire a number input so downstream code always sees a clamped integer.
+// While typing, the field is left alone (rewriting mid-keystroke would eat
+// "15" at the "1"); on change (blur/Enter) the clamped value is written back
+// so the field never displays a value the app isn't using.
 export function bindNumberInput(
   el: HTMLInputElement,
   min: number,
@@ -47,6 +50,11 @@ export function bindNumberInput(
   onChange: (value: number) => void
 ): void {
   el.addEventListener("input", () => onChange(clampInt(el.value, min, max)));
+  el.addEventListener("change", () => {
+    const value = clampInt(el.value, min, max);
+    el.value = String(value);
+    onChange(value);
+  });
 }
 
 export function populateQualitySelect(select: HTMLSelectElement): void {
