@@ -1,9 +1,9 @@
-# factorionuclear2.x
+# factoriopower2.x
 
 Nuclear, **fusion, and solar** power calculator for **Factorio 2.0.7 and
 later**, with quality support from the **Space Age** expansion.
 
-**Try it in your browser: <https://aliig.github.io/factorionuclear2.x/>**
+**Try it in your browser: <https://aliig.github.io/factoriopower2.x/>**
 
 Given an `x` by `y` grid of reactors, computes everything needed to convert
 their output into electricity: for nuclear, heat exchangers, steam turbines,
